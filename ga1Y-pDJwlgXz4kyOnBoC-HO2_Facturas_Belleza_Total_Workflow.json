@@ -1,0 +1,856 @@
+{
+  "name": "HO2 Facturas Belleza Total Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "19fCFXNvFL47WKOnniYRNoBEmJZchWWHN",
+          "mode": "list",
+          "cachedResultName": "Facturas Belleza Total",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/19fCFXNvFL47WKOnniYRNoBEmJZchWWHN"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "81db154c-1bd2-4adf-89f9-262f490ffdcb",
+      "name": "Google Drive Trigger - Facturas Belleza Total",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        64,
+        208
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6Cnbobs4MBSTWXXV",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf",
+              "drawingsToFormat": "application/pdf",
+              "slidesToFormat": "application/pdf",
+              "sheetsToFormat": "application/pdf"
+            }
+          }
+        }
+      },
+      "id": "ee736159-42d5-43be-bca4-c942c4eafe5b",
+      "name": "Download PDF File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        736,
+        208
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6Cnbobs4MBSTWXXV",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "540f4992-e042-496e-aa9b-cd338aad63c1",
+      "name": "Extract Text from PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n      \"tipo_fuente\": \"pdf\",\n      \"fecha\": \"10/09/2020\",\n      \"cliente_nombre\": \"Miriam Perez\",\n      \"cliente_contacto\": \"2222222\",\n      \"servicio\": \"Limpieza facial simple\",\n      \"monto_total_ars\": \"1000\",\n      \"forma_pago\": \"Tarjeta de debito\"\n    }\n"
+      },
+      "id": "c345ff93-f99e-4a12-8ebc-93a366d3649c",
+      "name": "Structured Output Parser - JSON Format",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1360,
+        432
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "maxTries": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=</contenido_del_documento>{{ $json.text }}\n<contenido_del_documento>\n</formato_del_documento>\n{{ $('Download PDF File').item.json.mimeType }}\n<formato_del_documento>",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres un asistente administrativo que analiza facturas y formularios de clientes de una empresa de estética. Extrae los siguientes campos: tipo_fuente (tipo de documento), fecha (formato DD/MM/YYYY), cliente_nombre (nombre completo del cliente), cliente_contacto (teléfono o email), servicio (descripción del servicio prestado), monto_total_ars (monto total en pesos argentinos), forma_pago (método de pago utilizado).\n"
+        }
+      },
+      "id": "3ec2e37a-7e89-42ec-b475-570da8adcdbc",
+      "name": "AI Agent - Extract Invoice Data",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1216,
+        192
+      ],
+      "alwaysOutputData": false,
+      "retryOnFail": false,
+      "maxTries": 2,
+      "notesInFlow": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "fileId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "fileName",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "mimeType",
+              "value": "={{ $json.mimeType }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "06cca021-beee-4bdb-adad-b026154020d9",
+      "name": "Get file type",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f7194955-a9fd-4d0c-96f5-6a742af5afdc",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "application/pdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        512,
+        208
+      ],
+      "id": "41bc3ab1-3683-4028-b94d-24d169bd6521",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1kQNnxr20AtLiCwhxCO1YigRg_ycEIJhBlfvgJV6MiRA",
+          "mode": "list",
+          "cachedResultName": "Registros de Facturas Belleza Total",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kQNnxr20AtLiCwhxCO1YigRg_ycEIJhBlfvgJV6MiRA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1720210118,
+          "mode": "list",
+          "cachedResultName": "Registros_de_Facturas_Belleza_Total",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kQNnxr20AtLiCwhxCO1YigRg_ycEIJhBlfvgJV6MiRA/edit#gid=1720210118"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tipo_fuente": "={{ $json.output.tipo_fuente }}",
+            "fecha": "={{ $json.output.fecha }}",
+            "cliente_contacto": "={{ $json.output.cliente_contacto }}",
+            "cliente_nombre": "={{ $json.output.cliente_nombre }}",
+            "servicio": "={{ $json.output.servicio }}",
+            "monto_total_ars": "={{ $json.output.monto_total_ars }}",
+            "forma_pago": "={{ $json.output.forma_pago }}",
+            "actualizado por": "N8N"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tipo_fuente",
+              "displayName": "tipo_fuente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente_nombre",
+              "displayName": "cliente_nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente_contacto",
+              "displayName": "cliente_contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "monto_total_ars",
+              "displayName": "monto_total_ars",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "forma_pago",
+              "displayName": "forma_pago",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "actualizado por",
+              "displayName": "actualizado por",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2176,
+        176
+      ],
+      "id": "7e334501-1e59-48c7-9a8a-7893a3c54941",
+      "name": "Append row in sheet"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU",
+          "mode": "list",
+          "cachedResultName": "Errores Workflow",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Errores_flujo_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ DateTime.now().format('dd/MM/yyyy - HH:mm:ss ')}}",
+            "WorkflowName": "Facturas Belleza Total Workflow",
+            "Level": "Info - not supported data type.",
+            "url": "N/A"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "WorkflowName",
+              "displayName": "WorkflowName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Level",
+              "displayName": "Level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        576
+      ],
+      "id": "4c07efce-483a-4535-8ffa-aaaea887be61",
+      "name": "Append row in sheet1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = items.map((item) => {\n  const {\n    tipo_fuente,\n    fecha,\n    cliente_nombre,\n    cliente_contacto,\n    servicio,\n    monto_total_ars,\n    forma_pago,\n  } = item.json.output;\n  if (\n    tipo_fuente &&\n    fecha &&\n    cliente_nombre &&\n    cliente_contacto &&\n    servicio &&\n    monto_total_ars &&\n    forma_pago\n  ) {\n    return item.json;\n  } else {\n    return { message: \"File not processed\" };\n  }\n});\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        512
+      ],
+      "id": "ebff0414-7282-4266-91dd-12ffc8f8292a",
+      "name": "Code in JavaScript",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0cb2e2d6-5c5a-4afd-aba4-daaa6170ec1f",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "\"File not processed\"",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1776,
+        512
+      ],
+      "id": "10bc8e7c-6ffa-44f8-9892-d9ab8fb5e1eb",
+      "name": "If1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU",
+          "mode": "list",
+          "cachedResultName": "Errores Workflow",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Errores_flujo_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F0S0el_7PkfUVurEDHslwN43VslVNAskAtMFi3ka5fU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Nombre del archivo": "={{ $('Get file type').item.json.fileName }}",
+            "Timestamp": "={{ DateTime.now().format('dd/MM/yyyy - HH:mm:ss ')}}",
+            "Error": "={{ $('Code in JavaScript').item.json.message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Nombre del archivo",
+              "displayName": "Nombre del archivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2176,
+        352
+      ],
+      "id": "9f33f896-feb9-48a0-bd1e-df8515fabe01",
+      "name": "Append row in sheet2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        448
+      ],
+      "id": "9da63af0-a58c-42a6-b447-09fb14063d32",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "content": "##Primer bloque de obtención de datos (trigger) y seteo de variables para uso en Nodo de AI Agentico\n \n",
+        "height": 752,
+        "width": 1104
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "bc6546bf-66f3-4db8-8d8b-7de36c877887",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7d031df6-2e89-4139-a3f8-6988a7b2d940",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "43d3f75f-edc5-4a8d-b328-9382f72dbd91",
+              "leftValue": "={{ $json.output.tipo_fuente }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1696,
+        192
+      ],
+      "id": "ebf67a35-6c09-4711-827d-81610cc3ad3f",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "content": "## Validación Output de IA\n**Con código Javascript** \no\n**Con un bloque if validando que el contenido no venga vacio**",
+        "height": 752,
+        "width": 432,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1552,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "5cfb385a-33fe-47b9-ba99-cfdf42e70b0c",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Bloque final de actualización de Google Sheet\nDependiendo el output de la IA y las validaciones posteriores actualizo una u otra tabla en Google Sheet.\n",
+        "height": 560,
+        "width": 304
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2032,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "5578d344-2ce0-40ab-b789-d6eaf8ad389e",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Nodo de IA\nProcesamiento de los datos obtenidos en el paso anterior a través de un modelo de lenguaje.",
+        "height": 752,
+        "width": 368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1152,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "b10a9f14-b253-4f8a-8ea6-8236ab8abc2a",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "GhYEaHS0qbZrMV7f",
+          "mode": "list",
+          "cachedResultName": "token_costs",
+          "cachedResultUrl": "/projects/GIr2pAPKsknmeaOq/datatables/GhYEaHS0qbZrMV7f"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_tokens",
+              "displayName": "total_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model",
+              "displayName": "model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_cost",
+              "displayName": "total_cost",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "optimizeBulk": false
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        304
+      ],
+      "id": "40685a92-9d8f-4317-8930-36c6e8b64bbd",
+      "name": "Insert row"
+    }
+  ],
+  "connections": {
+    "Google Drive Trigger - Facturas Belleza Total": {
+      "main": [
+        [
+          {
+            "node": "Get file type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF File": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text from PDF": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Extract Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser - JSON Format": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Extract Invoice Data",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Extract Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get file type": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Download PDF File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Extract Invoice Data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": null
+}

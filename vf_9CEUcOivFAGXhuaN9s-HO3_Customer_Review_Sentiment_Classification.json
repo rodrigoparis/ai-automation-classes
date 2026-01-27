@@ -1,0 +1,2283 @@
+{
+  "name": "HO3 Customer Review Sentiment Classification",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "valid_sentiments",
+              "value": "[\"Positivo\", \"Neutro\", \"Negativo\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-2",
+              "name": "valid_motivos",
+              "value": "[\"Precio\", \"Demora\", \"Calidad\", \"Atención\", \"App\", \"Variedad\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-3",
+              "name": "alert_email",
+              "value": "rparisdv@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "alert_motivos",
+              "value": "[\"Demora\", \"Calidad\"]",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f15d1d38-bb4d-4579-b62a-16650faaacaa",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2592,
+        -16
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "review_text",
+              "value": "={{ $('Get row(s) in sheet').item.json.review_text }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "review_id",
+              "value": "={{ $('Get row(s) in sheet').item.json.id || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5128e965-18c0-4a15-835f-11d59d85f902",
+      "name": "Extract Review Text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2368,
+        -16
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {
+          "maxOutputTokens": 500,
+          "temperature": 0.1
+        }
+      },
+      "id": "b4f889db-a1e8-4e1a-b6a5-870b22c44a83",
+      "name": "Google Gemini Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -2080,
+        224
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "j099853ldREEX9te",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"sentimiento\": \"\",\n\t\"motivo\": \"\",\n\t\"confianza\": 0\n}",
+        "autoFix": true,
+        "customizeRetryPrompt": true,
+        "prompt": "Instructions:\n--------------\n{instructions}\n--------------\nCompletion:\n--------------\n{completion}\n--------------\n\nAbove, the Completion did not satisfy the constraints given in the Instructions.\nError:\n--------------\n{error}\n--------------\n\nPlease try again. Please only respond with an answer that satisfies the constraints laid out in the Instructions. In case you cant follow the instructions the default value for fallback is:\n{\"sentimiento\":\"Neutro\",\"motivo\":\"Calidad\",\"confianza\":0.0}"
+      },
+      "id": "0c884b14-0afd-4f75-8934-f4cf21e7d234",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1952,
+        224
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "notesInFlow": false,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analiza la siguiente reseña de cliente y clasifícala.\n\nReseña: \"' + {{ $json.review_text }}+ '\"\n\nDebes clasificar en:\n- Sentimiento: exactamente uno de estos valores: {{ $('Workflow Configuration').item.json.valid_sentiments }}\n- Motivo: exactamente uno de estos valores: \n{{ $('Workflow Configuration').item.json.valid_motivos }}\n- Confianza: un número decimal entre 0 y 1 (máximo 2 decimales)\n\nRespuesta EXCLUSIVAMENTE en JSON con este esquema exacto:\n{\"sentimiento\":\"\",\"motivo\":\"\",\"confianza\":0}' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres un asistente experto en análisis de sentimiento de reseñas de clientes. Debes clasificar cada reseña con precisión usando únicamente los valores especificados. Responde SOLO con JSON válido, sin texto adicional."
+        }
+      },
+      "id": "f738c64a-3273-46ce-8cf0-41a98fbecdc0",
+      "name": "AI Classify Review",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2048,
+        -16
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const validSentiments = $('Workflow Configuration').first().json.valid_sentiments;\nconst validMotivos = $('Workflow Configuration').first().json.valid_motivos;\n\nfor (const item of $input.all()) {\n  const data = item.json.output;\n  \n  // Check if required fields exist\n  const hasRequiredFields = data.sentimiento !== undefined && \n                           data.motivo !== undefined && \n                           data.confianza !== undefined;\n  \n  // Validate sentimiento\n  const validSentimiento = validSentiments.includes(data.sentimiento);\n  \n  // Validate motivo\n  const validMotivo = validMotivos.includes(data.motivo);\n  \n  // Validate confianza (0-1, max 2 decimals)\n  const validConfianza = typeof data.confianza === 'number' && \n                        data.confianza >= 0 && \n                        data.confianza <= 1;\n  \n  const isValid = hasRequiredFields && validSentimiento && validMotivo && validConfianza;\n  \n  item.json.is_valid = isValid;\n  item.json.validation_errors = [];\n  \n  if (!hasRequiredFields) item.json.validation_errors.push('Missing required fields');\n  if (!validSentimiento) item.json.validation_errors.push('Invalid sentimiento value');\n  if (!validMotivo) item.json.validation_errors.push('Invalid motivo value');\n  if (!validConfianza) item.json.validation_errors.push('Invalid confianza value');\n}\n\nreturn $input.all();"
+      },
+      "id": "b354a454-f39e-419f-ad25-2bfa12b1b748",
+      "name": "Validate AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "40f5f56e-77fb-431e-b46b-e198badb0d8a",
+      "name": "Check Retry Result",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1392,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "sentimiento",
+              "value": "Neutro",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "motivo",
+              "value": "Calidad",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "confianza",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "id-4",
+              "name": "review_text",
+              "value": "={{ $('Get row(s) in sheet').item.json.review_text }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "review_id",
+              "value": "={{ $('Get row(s) in sheet').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "ai_success",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8ce0ef88-b1f0-41e5-8604-a226c4b530f3",
+      "name": "Set Fallback Values",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1168,
+        48
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Get row(s) in sheet').item.json.id }}",
+            "sentimiento": "={{ $json.output.sentimiento }}",
+            "motivo": "={{ $json.output.motivo }}",
+            "confianza": "={{ $json.output.confianza }}",
+            "timestamp": "={{ $now.toISO() }}",
+            "ai_success": "={{ $json.is_valid }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_text",
+              "displayName": "review_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confianza",
+              "displayName": "confianza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_success",
+              "displayName": "ai_success",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3982185b-cfca-4502-9139-3537a76d0dbd",
+      "name": "Update Review Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -960,
+        -48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $('Validate AI Output').item.json.output.sentimiento }}",
+              "rightValue": "Negativo",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "id-2",
+              "leftValue": "={{$('Workflow Configuration').item.json.alert_motivos.includes($('Validate AI Output').item.json.output.motivo) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f3e936d5-9f27-43ff-a858-1a797f9d2c23",
+      "name": "Check Alert Conditions",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -688,
+        -16
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "email_to",
+              "value": "={{ $('Workflow Configuration').item.json.alert_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "email_subject",
+              "value": "={{ '[Alerta Reviews] Caso negativo por ' + $json.motivo }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "email_body",
+              "value": "=<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px; }\n    .header { background-color: #d32f2f; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center; }\n    .content { background-color: white; padding: 20px; border-radius: 0 0 8px 8px; }\n    .field { margin-bottom: 15px; }\n    .field-label { font-weight: bold; color: #555; }\n    .field-value { margin-top: 5px; padding: 10px; background-color: #f5f5f5; border-left: 3px solid #d32f2f; }\n    .review-text { font-style: italic; background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }\n    .actions { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-top: 20px; }\n    .actions h3 { margin-top: 0; color: #1976d2; }\n    .actions ul { margin: 10px 0; padding-left: 20px; }\n    .link-button { display: inline-block; background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px; }\n    .link-button:hover { background-color: #1565c0;  color: white;}\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>🚨 Alerta de Reseña Negativa</h1>\n    </div>\n    <div class=\"content\">\n      <p>Se ha detectado una reseña con <strong>sentimiento NEGATIVO</strong> que requiere atención inmediata.</p>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Motivo:</div>\n        <div class=\"field-value\">{{ $json.motivo }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Nivel de Confianza:</div>\n        <div class=\"field-value\">{{ $json.confianza }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Review ID:</div>\n        <div class=\"field-value\">{{ $json.id }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Timestamp:</div>\n        <div class=\"field-value\">{{ $json.timestamp }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Texto de la Reseña:</div>\n        <div class=\"review-text\">\"{{ $('Extract Review Text').item.json.review_text }}\"</div>\n      </div>\n      \n      <div class=\"actions\">\n        <h3>Acciones Sugeridas:</h3>\n        <ul>\n          <li>Contactar al cliente de manera prioritaria</li>\n          <li>Generar ticket de seguimiento en el sistema</li>\n          <li>Revisar el caso con el equipo correspondiente</li>\n        </ul>\n        <a href=\"https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/\" class=\"link-button\">Ver Documento Completo</a>\n      </div>\n    </div>\n  </div>\n</body>\n</html>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b256e1c7-7221-41e8-8c91-62d678ced299",
+      "name": "Prepare Email Content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -448,
+        -208
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_to }}",
+        "subject": "={{ $json.email_subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "715d769a-70f7-402f-80d0-b98ea8e7bc28",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        -208
+      ],
+      "webhookId": "52fd7146-a779-4efb-b1cb-58921d2a700b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UCqbBJa2PzuV0zyG",
+          "name": "Gmail account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Update Review Row').item.json.id }}",
+            "alert_sent": "true"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_text",
+              "displayName": "review_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "confianza",
+              "displayName": "confianza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ai_success",
+              "displayName": "ai_success",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alert_sent",
+              "displayName": "alert_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5a4cdc68-34ac-4318-9d61-b9b33fc49499",
+      "name": "Mark Alert Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        -208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1872,
+        432
+      ],
+      "id": "c34fe989-b2fc-4e64-9259-54f76336d366",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "j099853ldREEX9te",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4480,
+        1472
+      ],
+      "id": "45f62e0d-f01b-47ab-98ed-98859edaaa18",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2816,
+        -16
+      ],
+      "id": "f72becfa-e788-467c-8824-b7fa19263a0c",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "apphPpzCbXqxQziE7",
+          "mode": "list",
+          "cachedResultName": "ai_costs_n8n",
+          "cachedResultUrl": "https://airtable.com/apphPpzCbXqxQziE7"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbloUJ4eUxMnkvvPH",
+          "mode": "list",
+          "cachedResultName": "AI Token Usage",
+          "cachedResultUrl": "https://airtable.com/apphPpzCbXqxQziE7/tbloUJ4eUxMnkvvPH"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "model": "={{ $json.model }}",
+            "total_tokens": "={{ $json.total_tokens }}",
+            "completion_tokens": "={{ $json.completion_tokens }}",
+            "prompt_tokens": "={{ $json.prompt_tokens }}",
+            "response": "={{ $json.response.toJsonString() }}",
+            "prompt": "={{ $json.prompt }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "duration_ms": "={{ $json.duration_ms }}",
+            "total_llm_calls": "={{ $json.total_llm_calls }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model",
+              "displayName": "model",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "response",
+              "displayName": "response",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_cost",
+              "displayName": "total_cost",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "total_tokens",
+              "displayName": "total_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_tokens",
+              "displayName": "prompt_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "completion_tokens",
+              "displayName": "completion_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_llm_calls",
+              "displayName": "total_llm_calls",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_pricing_reference",
+              "displayName": "model_pricing_reference",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "input_price_per_M",
+              "displayName": "input_price_per_M",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "output_price_per_M",
+              "displayName": "output_price_per_M",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "duration_ms",
+              "displayName": "duration_ms",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        368,
+        1168
+      ],
+      "id": "cde45431-29b9-48a4-bf8d-144607062742",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "hyLY8MB9pZHJeKmC",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "vf_9CEUcOivFAGXhuaN9s",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/vf_9CEUcOivFAGXhuaN9s",
+          "cachedResultName": "AI Automation Soy Henry — HO3 Customer Review Sentiment Classification"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $execution.id }}"
+          },
+          "matchingColumns": [
+            "execution_id"
+          ],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "dcfa5120-78e2-4f77-a832-f0d2a1c17df1",
+      "name": "Call 'Customer Review Sentiment Classification with AI and Email Alerts'",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_id": "={{ $json.review_id }}",
+            "sentimiento": "={{ $json.sentimiento }}",
+            "motivo": "={{ $json.motivo }}",
+            "confianza": "={{ $json.confianza }}",
+            "timestamp": "={{ $now.setZone('America/Buenos_Aires') }}",
+            "ai_n8n_workflow_id": "={{ $json.ai_execution_id }}",
+            "validation_errors": "={{ $json.validation_errors.isEmpty() ? \"No errors found\" : $json.validation_errors }}",
+            "ai_reviewed": "TRUE",
+            "alert_sent": "= {{ $json.send_alert ? \"In progress\" : \"N/A\" }}",
+            "send_alert": "={{ $json.send_alert }}"
+          },
+          "matchingColumns": [
+            "review_id"
+          ],
+          "schema": [
+            {
+              "id": "review_id",
+              "displayName": "review_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_text",
+              "displayName": "review_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ai_reviewed",
+              "displayName": "ai_reviewed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confianza",
+              "displayName": "confianza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "send_alert",
+              "displayName": "send_alert",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "alert_sent",
+              "displayName": "alert_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "validation_errors",
+              "displayName": "validation_errors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ai_n8n_workflow_id",
+              "displayName": "ai_n8n_workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3e9836ee-d054-4086-ab13-ad07677fb849",
+      "name": "Update Review Batch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -3120,
+        1024
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -3488,
+        1472
+      ],
+      "id": "ba3b048f-4752-4480-bb19-1ce6591f6b91",
+      "name": "Loop Over  Batch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "valid_sentiments",
+              "value": "[\"Positivo\", \"Neutro\", \"Negativo\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-2",
+              "name": "valid_motivos",
+              "value": "[\"Precio\", \"Demora\", \"Calidad\", \"Atención\", \"Variedad\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-3",
+              "name": "alert_email",
+              "value": "rparisdv@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "alert_motivos",
+              "value": "[\"Demora\", \"Calidad\"]",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d79b03b-2a64-4a14-9f1f-b5e5a9f890c0",
+      "name": "Workflow Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4240,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ai_reviewed"
+            }
+          ]
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically",
+              "readRowsUntil": "firstEmptyRow"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -4016,
+        1472
+      ],
+      "id": "a96a04e6-7a46-4288-a352-9792f013b22d",
+      "name": "Get Reviews  Batch",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const executionData = $input.first().json; \nconst runData = $input.first().json.data.resultData.runData;\nconst workflowName = executionData.workflowData ? executionData.workflowData.name : \"Unknown Workflow\";\n\n// 2. Identify the specific Node we want to analyze\n// IMPORTANT: In your JSON, the node is named \"Main Gemini Model \" (with a trailing space!)\nconst modelNodeName = \"Main Gemini Model \"; \nconst modelRuns = runData[modelNodeName];\n\n// Initialize counters\nlet totalTokens = 0;\nlet promptTokens = 0;\nlet completionTokens = 0;\nlet totalDuration = 0;\nlet modelName = \"unknown\";\nlet lastPrompt = \"\";\n\n\n// 3. Loop through every time the LLM ran (since it was in a batch loop)\nif (modelRuns) {\n  modelRuns.forEach(run => {\n    // A. Add up execution time (duration)\n    totalDuration += run.executionTime;\n\n    // B. Dig into the AI data structure for this run\n    const aiData = run.data.ai_languageModel[0][0];\n    const inputData = run.inputOverride.ai_languageModel[0][0];\n\n    // C. Get Token Usage\n    if (aiData.json.tokenUsage) {\n      totalTokens += aiData.json.tokenUsage.totalTokens;\n      promptTokens += aiData.json.tokenUsage.promptTokens;\n      completionTokens += aiData.json.tokenUsage.completionTokens;\n    }\n\n    // D. Capture static info (Model & Prompt) from the last run\n    // (We use optional chaining ?. just in case)\n    modelName = inputData?.json?.options?.model || modelName;\n    lastPrompt = inputData?.json?.messages?.[0] || lastPrompt;\n  });\n}\n\n// 4. Extract the Response\n// Since the Model node output is raw/messy, it's cleaner to get the\n// parsed answer from the \"Structured Output Parser Batch\" node if available.\nconst parserNodeName = \"Structured Output Parser Batch\";\nconst parserRuns = runData[parserNodeName] || [];\n\n// Collect all processed responses into one array\nconst fullResponse = parserRuns.map(run => {\n  // Try to find the parsed output\n  return run.data.ai_outputParser?.[0]?.[0]?.json?.response?.output || null;\n}).flat().filter(item => item !== null);\n\n\n// 5. Return the clean summary object\nreturn {\n  workflow_name: workflowName,\n  model: `models/${modelName}`,\n  prompt: lastPrompt, // Showing the prompt template used\n  response: fullResponse, // The clean JSON array of classified reviews\n  total_tokens: totalTokens,\n  prompt_tokens: promptTokens,\n  completion_tokens: completionTokens,\n  total_llm_calls: modelRuns ? modelRuns.length : 0,\n  duration_ms: totalDuration\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1168
+      ],
+      "id": "e582a776-fe46-44c1-bc57-b698ab25adc9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cgZjZC-zI1Su-lznfjRnK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/cgZjZC-zI1Su-lznfjRnK",
+          "cachedResultName": "AI Automation Soy Henry — AI Sentiment Analysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "data"
+          ],
+          "schema": [
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -3024,
+        1488
+      ],
+      "id": "fa6a1417-6874-4bc4-937a-3a53af9c957f",
+      "name": "Call 'AI Sentiment Analysis'"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "specifiedFields",
+        "fieldsToInclude": "review_id, review_text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -3216,
+        1488
+      ],
+      "id": "ac77ed16-616e-4f6a-b73b-a7bff76b6a0d",
+      "name": "Aggregate  Batch"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "apphPpzCbXqxQziE7",
+          "mode": "list",
+          "cachedResultName": "ai_costs_n8n",
+          "cachedResultUrl": "https://airtable.com/apphPpzCbXqxQziE7"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbloUJ4eUxMnkvvPH",
+          "mode": "list",
+          "cachedResultName": "AI Token Usage",
+          "cachedResultUrl": "https://airtable.com/apphPpzCbXqxQziE7/tbloUJ4eUxMnkvvPH"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "model": "={{ $json.model }}",
+            "total_tokens": "={{ $json.total_tokens }}",
+            "completion_tokens": "={{ $json.completion_tokens }}",
+            "prompt_tokens": "={{ $json.prompt_tokens }}",
+            "response": "={{ $json.response.toJsonString() }}",
+            "prompt": "={{ $json.prompt }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "duration_ms": "={{ $json.duration_ms }}",
+            "total_llm_calls": "={{ $json.total_llm_calls }}",
+            "parent_execution": "={{ $json.parent_execution }}",
+            "ai_execution": "={{ $json.ai_execution_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "parent_execution",
+              "displayName": "parent_execution",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ai_execution",
+              "displayName": "ai_execution",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model",
+              "displayName": "model",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "response",
+              "displayName": "response",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_cost",
+              "displayName": "total_cost",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "total_tokens",
+              "displayName": "total_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_tokens",
+              "displayName": "prompt_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "completion_tokens",
+              "displayName": "completion_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total_llm_calls",
+              "displayName": "total_llm_calls",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "duration_ms",
+              "displayName": "duration_ms",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_pricing_reference",
+              "displayName": "model_pricing_reference",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "input_price_per_M",
+              "displayName": "input_price_per_M",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "output_price_per_M",
+              "displayName": "output_price_per_M",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Creada",
+              "displayName": "Creada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -1952,
+        1488
+      ],
+      "id": "a7a3d456-9c2b-4fbe-b7cd-02de02276394",
+      "name": "Create a record1",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "hyLY8MB9pZHJeKmC",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const executionData = $input.first().json; \nconst runData = $input.first().json.data.resultData.runData;\nconst workflowName = executionData.workflowData ? executionData.workflowData.name : \"Unknown Workflow\";\n\nconst parentData = runData?.[\"When Executed by Another Workflow\"]?.[0]?.metadata?.parentExecution;\n\n// 2. Identify the specific Node we want to analyze\n// IMPORTANT: In your JSON, the node is named \"Main Gemini Model \" (with a trailing space!)\nconst modelNodeName = \"Main Gemini Model \"; \nconst modelRuns = runData[modelNodeName];\n\n// Initialize counters\nlet totalTokens = 0;\nlet promptTokens = 0;\nlet completionTokens = 0;\nlet totalDuration = 0;\nlet modelName = \"unknown\";\nlet lastPrompt = \"\";\n\n\n// 3. Loop through every time the LLM ran (since it was in a batch loop)\nif (modelRuns) {\n  modelRuns.forEach(run => {\n    // A. Add up execution time (duration)\n    totalDuration += run.executionTime;\n\n    // B. Dig into the AI data structure for this run\n    const aiData = run.data.ai_languageModel[0][0];\n    const inputData = run.inputOverride.ai_languageModel[0][0];\n\n    // C. Get Token Usage\n    if (aiData.json.tokenUsage) {\n      totalTokens += aiData.json.tokenUsage.totalTokens;\n      promptTokens += aiData.json.tokenUsage.promptTokens;\n      completionTokens += aiData.json.tokenUsage.completionTokens;\n    }\n\n    // D. Capture static info (Model & Prompt) from the last run\n    // (We use optional chaining ?. just in case)\n    modelName = inputData?.json?.options?.model || modelName;\n    lastPrompt = inputData?.json?.messages?.[0] || lastPrompt;\n  });\n}\n\n// 4. Extract the Response\n// Since the Model node output is raw/messy, it's cleaner to get the\n// parsed answer from the \"Structured Output Parser Batch\" node if available.\nconst parserNodeName = \"Structured Output Parser Batch\";\nconst parserRuns = runData[parserNodeName] || [];\n\n// Collect all processed responses into one array\nconst fullResponse = parserRuns.map(run => {\n  // Try to find the parsed output\n  return run.data.ai_outputParser?.[0]?.[0]?.json?.response?.output || null;\n}).flat().filter(item => item !== null);\n\n\n// 5. Return the clean summary object\nreturn {\n  workflow_name: workflowName,\n  model: `models/${modelName}`,\n  prompt: lastPrompt, // Showing the prompt template used\n  response: fullResponse, // The clean JSON array of classified reviews\n  total_tokens: totalTokens,\n  prompt_tokens: promptTokens,\n  completion_tokens: completionTokens,\n  total_llm_calls: modelRuns ? modelRuns.length : 0,\n  duration_ms: totalDuration,\n  parent_execution: parentData ? parentData.executionId : \"No parent execution\",\n  ai_execution_id : $input.first().json.id\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2320,
+        1488
+      ],
+      "id": "1cc9eb29-7d33-4424-8cd4-dc959771b911",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $json.ai_execution_id }}",
+        "options": {
+          "activeWorkflows": true
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -2496,
+        1488
+      ],
+      "id": "1be9feff-80df-4bb5-884c-7e4584ac6328",
+      "name": "Get an execution",
+      "credentials": {
+        "n8nApi": {
+          "id": "ApYUoMlu29ZMFZ5q",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.send_alert }}",
+              "rightValue": "Negativo",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5c81677c-f688-4017-81b7-8c09ac1b05e1",
+      "name": "Check Alert Conditions Batch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2848,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "email_to",
+              "value": "={{ $('Workflow Variables').item.json.alert_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "email_subject",
+              "value": "={{ '[Alerta Reviews] Caso negativo por ' + $json.motivo }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "email_body",
+              "value": "=<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px; }\n    .header { background-color: #d32f2f; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center; }\n    .content { background-color: white; padding: 20px; border-radius: 0 0 8px 8px; }\n    .field { margin-bottom: 15px; }\n    .field-label { font-weight: bold; color: #555; }\n    .field-value { margin-top: 5px; padding: 10px; background-color: #f5f5f5; border-left: 3px solid #d32f2f; }\n    .review-text { font-style: italic; background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }\n    .actions { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-top: 20px; }\n    .actions h3 { margin-top: 0; color: #1976d2; }\n    .actions ul { margin: 10px 0; padding-left: 20px; }\n    .link-button { display: inline-block; background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px; }\n    .link-button:hover { background-color: #1565c0;  color: white;}\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>🚨 Alerta de Reseña Negativa</h1>\n    </div>\n    <div class=\"content\">\n      <p>Se ha detectado una reseña con <strong>sentimiento NEGATIVO</strong> que requiere atención inmediata.</p>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Motivo:</div>\n        <div class=\"field-value\">{{ $json.motivo }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Nivel de Confianza:</div>\n        <div class=\"field-value\">{{ $json.confianza }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Review ID:</div>\n        <div class=\"field-value\">{{ $json.review_id }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Timestamp:</div>\n        <div class=\"field-value\">{{ $json.timestamp }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Texto de la Reseña:</div>\n\n        <div class=\"review-text\">\"{{ $('Get Reviews  Batch').all().find(item => item.json.review_id == $json.review_id).json.review_text}}\n\"</div>\n      </div>\n      \n      <div class=\"actions\">\n        <h3>Acciones Sugeridas:</h3>\n        <ul>\n          <li>Contactar al cliente de manera prioritaria</li>\n          <li>Generar ticket de seguimiento en el sistema</li>\n          <li>Revisar el caso con el equipo correspondiente</li>\n        </ul>\n        <a href=\"https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/\" class=\"link-button\">Ver Documento Completo</a>\n      </div>\n    </div>\n  </div>\n</body>\n</html>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "62e173a3-070a-459a-9b5f-b24921807c87",
+      "name": "Prepare Email  Batch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2512,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_to }}",
+        "subject": "={{ $json.email_subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "c24a20a6-3c6d-40df-a5f2-bde7c1ed89ac",
+      "name": "Send Alert  Batch",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2288,
+        1008
+      ],
+      "webhookId": "52fd7146-a779-4efb-b1cb-58921d2a700b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UCqbBJa2PzuV0zyG",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_id": "={{ $('Check Alert Conditions Batch').item.json.review_id }}",
+            "alert_sent": "Done"
+          },
+          "matchingColumns": [
+            "review_id"
+          ],
+          "schema": [
+            {
+              "id": "review_id",
+              "displayName": "review_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_text",
+              "displayName": "review_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ai_reviewed",
+              "displayName": "ai_reviewed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "confianza",
+              "displayName": "confianza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "send_alert",
+              "displayName": "send_alert",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alert_sent",
+              "displayName": "alert_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "validation_errors",
+              "displayName": "validation_errors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ai_n8n_workflow_id",
+              "displayName": "ai_n8n_workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2777ff38-4402-41c0-bbef-d08d0af52e5f",
+      "name": "Mark Alert Sent  Batch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2064,
+        1008
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2752,
+        1488
+      ],
+      "id": "8ff95d0e-d4fc-4241-a727-9e4d39fa2c1a",
+      "name": "Wait1",
+      "webhookId": "c10278b4-964c-48bb-8852-510acd1e14ef"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2128,
+        1488
+      ],
+      "id": "1a7b40ce-fab3-45bb-ac6a-bcfa60d6708d",
+      "name": "Wait",
+      "webhookId": "c10278b4-964c-48bb-8852-510acd1e14ef"
+    },
+    {
+      "parameters": {
+        "content": "### 🚀 Step 1: Initialization\n- **Config:** Sets global arrays for sentiments and alerts.\n- **Fetch:** Retrieves pending reviews from Google Sheets.\n- **Goal:** Prepare the payload for the AI Loop.",
+        "height": 512,
+        "width": 880,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4608,
+        1296
+      ],
+      "typeVersion": 1,
+      "id": "6ddd8629-7d3b-4e6d-aa55-e410bc45874b",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "### 🔄 Loop & Analysis Phase\n- **Batching:** Processes 5 items at a time for stability.\n- **AI Sync:** Calls 'AI Sentiment Analysis' subworkflow and waits for JSON response.\n- **Storage:** Updates Google Sheets with:\n    - AI Results (Sentiment/Reason/Confidence).\n    - Audit Trail (Execution ID, Timestamp).\n    - Validation (Errors/Success flags).\n",
+        "height": 512,
+        "width": 880,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3680,
+        1296
+      ],
+      "typeVersion": 1,
+      "id": "df534d0e-49c9-4799-9dce-d0050375e9a0",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "### 📊 FinOps & Audit Phase\n- **Fetch:** Uses n8n API to get deep metadata from the AI execution.\n- **Compute:** Custom JS script calculates total tokens, costs, and latency.\n- **Trace:** Links Parent Execution ID with AI Subworkflow ID.\n- **Log:** Creates a permanent audit record in Airtable for budget tracking.\n- **DB:** [Airtable AI Costs](https://airtable.com/apphPpzCbXqxQziE7)",
+        "height": 496,
+        "width": 864,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2592,
+        1296
+      ],
+      "typeVersion": 1,
+      "id": "04d3b648-3e58-4602-909e-103a04b0db7d",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "### 🚨 Alert & Escalation Phase\n- **Sheet:** [Update Reviews](https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0)\n- **Filter:** Escalates only if `send_alert` is TRUE.\n- **Template:** Generates HTML/CSS email with:\n    - Original Review Text.\n    - AI Sentiment/Motivo.\n    - Suggested Recovery Actions.\n- **Delivery:** Sends via Gmail to the configured Admin email.\n- **Logging:** Updates Google Sheets `alert_sent` status to \"Done\".\n- **Sheet:** [Update Reviews after email](https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0)",
+        "height": 496,
+        "width": 1328
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3168,
+        768
+      ],
+      "typeVersion": 1,
+      "id": "009c9aa1-ffcc-4a45-870a-8b44fe61d3ce",
+      "name": "Sticky Note5"
+    }
+  ],
+  "connections": {
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Extract Review Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Review Text": {
+      "main": [
+        [
+          {
+            "node": "AI Classify Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Classify Review",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Classify Review",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Classify Review": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Output": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Result": {
+      "main": [
+        [
+          {
+            "node": "Update Review Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Fallback Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fallback Values": {
+      "main": [
+        [
+          {
+            "node": "Update Review Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Review Row": {
+      "main": [
+        [
+          {
+            "node": "Check Alert Conditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Alert Conditions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Customer Review Sentiment Classification with AI and Email Alerts'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Alert Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Alert Sent": {
+      "main": [
+        [
+          {
+            "node": "Call 'Customer Review Sentiment Classification with AI and Email Alerts'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Workflow Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Review Batch": {
+      "main": [
+        [
+          {
+            "node": "Check Alert Conditions Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over  Batch": {
+      "main": [
+        [
+          {
+            "node": "Update Review Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Variables": {
+      "main": [
+        [
+          {
+            "node": "Get Reviews  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reviews  Batch": {
+      "main": [
+        [
+          {
+            "node": "Loop Over  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'AI Sentiment Analysis'": {
+      "main": [
+        [
+          {
+            "node": "Loop Over  Batch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate  Batch": {
+      "main": [
+        [
+          {
+            "node": "Call 'AI Sentiment Analysis'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an execution": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Alert Conditions Batch": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email  Batch": {
+      "main": [
+        [
+          {
+            "node": "Send Alert  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert  Batch": {
+      "main": [
+        [
+          {
+            "node": "Mark Alert Sent  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Alert Sent  Batch": {
+      "main": [
+        []
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Get an execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Create a record1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

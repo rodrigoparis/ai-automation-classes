@@ -1,0 +1,358 @@
+{
+  "name": "AI Sentiment Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\nconst validSentiments = $('Workflow Variables').first().json.valid_sentiments;\nconst validMotivos = $('Workflow Variables').first().json.valid_motivos;\n\nconst newItems = [];\n\n// Iteramos sobre los ítems de entrada (normalmente es 1 solo ítem que contiene el Array del LLM)\nfor (const item of $input.all()) {\n  console.log(\"...........\")\n  console.log(item.json)\n  // DETECCIÓN: Dependiendo de tu nodo anterior, el array puede estar en 'item.json' o 'item.json.output'\n  // Si usaste el Output Parser Structured, suele devolver el objeto mezclado en el root.\n  // Asumiremos que item.json ES el array o contiene la propiedad donde está el array.\n  \n  let batchData = item.json;\n  \n  // Si por casualidad el parser lo metió dentro de una propiedad 'output', usamos esa:\n  if (item.json.output && Array.isArray(item.json.output)) {\n    batchData = item.json.output;\n  } \n  // Si item.json no es array (es un objeto único), lo convertimos en array para que el loop funcione\n  else if (!Array.isArray(item.json)) {\n     batchData = [item.json];\n  }\n\n  // --- AHORA PROCESAMOS REVIEW POR REVIEW DENTRO DEL BATCH ---\n  for (const review of batchData) {\n    \n    // Check if required fields exist\n    const hasRequiredFields = review.sentimiento !== undefined && \n                              review.motivo !== undefined && \n                              review.confianza !== undefined;\n    \n    // Validate sentimiento\n    const validSentimiento = validSentiments.includes(review.sentimiento);\n    \n    // Validate motivo\n    const validMotivo = validMotivos.includes(review.motivo);\n    \n    // Validate confianza (0-1)\n    // Nota: El parser ya nos asegura que es number, pero validamos rango por seguridad\n    const validConfianza = typeof review.confianza === 'number' && \n                           review.confianza >= 0 && \n                           review.confianza <= 1;\n    \n    const isValid = hasRequiredFields && validSentimiento && validMotivo && validConfianza;\n    \n    // Preparamos el objeto de error\n    const validationErrors = [];\n    if (!hasRequiredFields) validationErrors.push('Missing required fields');\n    if (!validSentimiento) validationErrors.push(`Invalid sentimiento: ${review.sentimiento}`);\n    if (!validMotivo) validationErrors.push(`Invalid motivo: ${review.motivo}`);\n    if (!validConfianza) validationErrors.push(`Invalid confianza: ${review.confianza}`);\n\n    const isNegative = review.sentimiento === 'Negativo';\n    const isCriticalMotive = ['Demora', 'Calidad'].includes(review.motivo);\n    \n    // Solo enviamos alerta si la review es válida Y cumple las condiciones críticas\n    const sendAlert = isValid && isNegative && isCriticalMotive;\n\n    // CREAMOS EL NUEVO ÍTEM DE SALIDA\n    // Clonamos la review y le agregamos los flags de validación\n    newItems.push({\n      json: {\n        ...review,\n        is_valid: isValid,\n        validation_errors: validationErrors,\n        row_number: review.row_number || item.json.row_number,\n        send_alert: sendAlert,\n        ai_execution_id:  $execution.id\n      }\n    });\n  }\n}\n\nreturn newItems;"
+      },
+      "id": "f3da66fe-a703-40bc-99f1-7a19310cd2a7",
+      "name": "Validate AI Output Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You will analyze each review from the input ARRAY:\n{{ JSON.stringify($('When Executed by Another Workflow').item.json.data) }} and return sentimiento | motivo | confianza. \n\nContext & Constraints:\n1. VALID_SENTIMENTS: {{ $('Workflow Variables').item.json.valid_sentiments }}\n2. VALID_MOTIVOS: {{ $('Workflow Variables').item.json.valid_motivos }}\n\nInstruction:\nFor each review in the array, determine the sentiment, the most relevant motive from the list, and a confidence score.\n\nOUTPUT (STRICT JSON):\nReturn an ARRAY with the same length as the input. Each item:\n{\n  \"review_id\":\"string\",\n  \"sentimiento\":\"string\",\n  \"motivo\": \"string\",\n  \"confianza\": double\n}\n\nRespond ONLY with the JSON array. No extra text. No markdown.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert sentiment analyzer.",
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "68b3e274-eb72-4381-af76-60df858ff142",
+      "name": "AI Classify Review Batch",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        832,
+        432
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[\n  {\n    \"review_id\": \"string\",\n    \"sentimiento\": \"string\",\n    \"motivo\": \"string\",\n    \"confianza\": 0.1  \n  }\n]",
+        "autoFix": true
+      },
+      "id": "4b5ae397-f416-4a5d-b123-03deacd41fda",
+      "name": "Structured Output Parser Batch",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        656
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "notesInFlow": false,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 1000,
+          "temperature": 0.2
+        }
+      },
+      "id": "a2ddaae8-2408-4113-b00f-3371f365b849",
+      "name": "Main Gemini Model ",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        800,
+        656
+      ],
+      "retryOnFail": false,
+      "maxTries": 2,
+      "waitBetweenTries": 500,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "j099853ldREEX9te",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        864
+      ],
+      "id": "758bffd3-a6f0-42f9-9449-b930173de5fc",
+      "name": "Parser Gemini Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "j099853ldREEX9te",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d8a3fb9a-bef3-4665-86a0-14f91fc31b56",
+      "name": "Check Retry Result  Batch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1424,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "796f45e7-15bc-49ac-9a83-3f1baf353ab4",
+      "name": "Set Fallback Values  Batch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "data",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        432
+      ],
+      "id": "e5ce2672-76fd-4549-a65d-7bb734fe9660",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "valid_sentiments",
+              "value": "[\"Positivo\", \"Neutro\", \"Negativo\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-2",
+              "name": "valid_motivos",
+              "value": "[\"Precio\", \"Demora\", \"Calidad\", \"Atención\", \"Variedad\"]",
+              "type": "array"
+            },
+            {
+              "id": "id-3",
+              "name": "alert_email",
+              "value": "rparisdv@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "alert_motivos",
+              "value": "[\"Demora\", \"Calidad\"]",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0075f523-9101-4992-9d67-fd4c96fe4138",
+      "name": "Workflow Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Validate AI Output Batch": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Result  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Classify Review Batch": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate AI Output Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser Batch": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Classify Review Batch",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Main Gemini Model ": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Classify Review Batch",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Gemini Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser Batch",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Result  Batch": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set Fallback Values  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Workflow Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Variables": {
+      "main": [
+        [
+          {
+            "node": "AI Classify Review Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fallback Values  Batch": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "data": [
+            {
+              "review_id": "T027",
+              "review_text": "La atención al cliente fue deficiente. Me pasaron de agente en agente sin solución."
+            },
+            {
+              "review_id": "T029",
+              "review_text": "Funciona de maravilla, ha simplificado mi vida diaria."
+            },
+            {
+              "review_id": "T050",
+              "review_text": "No puedo creer que hayan quitado mi función favorita en la última versión."
+            },
+            {
+              "review_id": "T033",
+              "review_text": "Me apareció un mensaje de error genérico al guardar. El resto del tiempo funciona de maravillas."
+            },
+            {
+              "review_id": "T040",
+              "review_text": "Sin duda la mejor inversión en productividad que he hecho este año."
+            }
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "triggerCount": 0,
+  "meta": null
+}

@@ -1,0 +1,374 @@
+{
+  "name": "Send Email Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.send_alert }}",
+              "rightValue": "Negativo",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "bca2dd06-1417-42fa-80e0-9bf176a8b4de",
+      "name": "Check Alert Conditions Batch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -928,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "email_to",
+              "value": "={{ $('Start').item.json.alert_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "email_subject",
+              "value": "={{ '[Alerta Reviews] Caso negativo por ' + $json.motivo }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "email_body",
+              "value": "=<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px; }\n    .header { background-color: #d32f2f; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center; }\n    .content { background-color: white; padding: 20px; border-radius: 0 0 8px 8px; }\n    .field { margin-bottom: 15px; }\n    .field-label { font-weight: bold; color: #555; }\n    .field-value { margin-top: 5px; padding: 10px; background-color: #f5f5f5; border-left: 3px solid #d32f2f; }\n    .review-text { font-style: italic; background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; }\n    .actions { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-top: 20px; }\n    .actions h3 { margin-top: 0; color: #1976d2; }\n    .actions ul { margin: 10px 0; padding-left: 20px; }\n    .link-button { display: inline-block; background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px; }\n    .link-button:hover { background-color: #1565c0;  color: white;}\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>🚨 Alerta de Reseña Negativa</h1>\n    </div>\n    <div class=\"content\">\n      <p>Se ha detectado una reseña con <strong>sentimiento NEGATIVO</strong> que requiere atención inmediata.</p>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Motivo:</div>\n        <div class=\"field-value\">{{ $json.motivo }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Nivel de Confianza:</div>\n        <div class=\"field-value\">{{ $json.confianza }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Review ID:</div>\n        <div class=\"field-value\">{{ $json.review_id }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Timestamp:</div>\n        <div class=\"field-value\">{{ $json.timestamp }}</div>\n      </div>\n      \n      <div class=\"field\">\n        <div class=\"field-label\">Texto de la Reseña:</div>\n        <div class=\"review-text\">\"{{ $('Start').first().json.Get_Reviews__Batch_allItems.find(item => item.json.review_id == $json.review_id).json.review_text }}\"</div>\n      </div>\n      \n      <div class=\"actions\">\n        <h3>Acciones Sugeridas:</h3>\n        <ul>\n          <li>Contactar al cliente de manera prioritaria</li>\n          <li>Generar ticket de seguimiento en el sistema</li>\n          <li>Revisar el caso con el equipo correspondiente</li>\n        </ul>\n        <a href=\"https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/\" class=\"link-button\">Ver Documento Completo</a>\n      </div>\n    </div>\n  </div>\n</body>\n</html>",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "76c3ef39-34bb-4f97-93be-77843f7ffb4e",
+      "name": "Prepare Email  Batch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -608,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email_to }}",
+        "subject": "={{ $json.email_subject }}",
+        "emailType": "html",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "33c1b65f-529f-4b7d-b6e2-5eafd5ac5839",
+      "name": "Send Alert  Batch",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -384,
+        1056
+      ],
+      "webhookId": "52fd7146-a779-4efb-b1cb-58921d2a700b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UCqbBJa2PzuV0zyG",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY",
+          "mode": "list",
+          "cachedResultName": "reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Reviews",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qW5cHejnKHJtDJ4TKMVqgJewJ6wupQHNV_bxowjztY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "review_id": "={{ $('Check Alert Conditions Batch').item.json.review_id }}",
+            "send_alert": "true"
+          },
+          "matchingColumns": [
+            "review_id"
+          ],
+          "schema": [
+            {
+              "id": "review_id",
+              "displayName": "review_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_text",
+              "displayName": "review_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "confianza",
+              "displayName": "confianza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "send_alert",
+              "displayName": "send_alert",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_valid",
+              "displayName": "is_valid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "validation_errors",
+              "displayName": "validation_errors",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "0cc26df6-abdc-4a34-9029-fc82655b6413",
+      "name": "Mark Alert Sent  Batch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -160,
+        1056
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cWLSasyDmdFoHq1F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        1056
+      ],
+      "id": "6d539f9b-af95-43e5-944f-e81b388fe419",
+      "name": "Wait1",
+      "webhookId": "c10278b4-964c-48bb-8852-510acd1e14ef"
+    },
+    {
+      "id": "cebaf1d5-2025-4ddc-be81-59fc3f51caf3",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -1136,
+        1216
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "send_alert",
+              "type": "any"
+            },
+            {
+              "name": "alert_email",
+              "type": "any"
+            },
+            {
+              "name": "Get_Reviews__Batch_allItems",
+              "type": "any"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Check Alert Conditions Batch": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Email  Batch": {
+      "main": [
+        [
+          {
+            "node": "Send Alert  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert  Batch": {
+      "main": [
+        [
+          {
+            "node": "Mark Alert Sent  Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Alert Sent  Batch": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        []
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check Alert Conditions Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": null
+}

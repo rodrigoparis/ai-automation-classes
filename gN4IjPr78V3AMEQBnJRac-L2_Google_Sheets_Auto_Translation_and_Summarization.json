@@ -1,0 +1,1272 @@
+{
+  "name": "L2 Google Sheets Auto-Translation and Summarization",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw",
+          "mode": "list",
+          "cachedResultName": "TotalService Multiidioma",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 165186522,
+          "mode": "list",
+          "cachedResultName": "TotalService_Multiidioma",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit#gid=165186522"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "076aea8b-5e68-4531-930e-bdaec780d6c8",
+      "name": "New Row in Google Sheets",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3984,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "row_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "texto_original",
+              "value": "={{ $json.texto_original }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "retry_count",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0218db8d-f782-4031-b103-d610e817a887",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3792,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.texto_original }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "44807624-5fdc-4703-b149-b802c96b4f5e",
+      "name": "Check texto_original Not Empty",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3568,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "estado",
+              "value": "empty_text",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "detalle",
+              "value": "texto_original is empty or missing",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c6adfd48-7fb1-4e87-8230-047555dc4e90",
+      "name": "Prepare Empty Text Log",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n      \"row_id\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"idioma\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"traduccion_es\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"resumen_bullets\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t},\n\t\t\t\"minItems\": 3,\n\t\t\t\"maxItems\": 3\n\t\t},\n      \"texto_original\": {\n        \"type\":\"string\"\n\t},\n\t\"required\": [\"id\",\n      \"idioma\", \"traduccion_es\", \"resumen_bullets\"]\n}\n}"
+      },
+      "id": "00029f3c-8a21-447d-ba9f-97b84893cf0e",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -3104,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analiza el siguiente texto y devuelve ÚNICAMENTE un objeto JSON válido con este formato exacto:\n{\"row_id\":,\"row_id detectado\",\n\"idioma\":\"código ISO del idioma detectado (ej: en, es, fr)\",\"traduccion_es\":\"traducción al español neutro del texto completo\",\"resumen_bullets\":[\"viñeta 1 de 5-15 palabras\",\"viñeta 2 de 5-15 palabras\",\"viñeta 3 de 5-15 palabras\"],\n\"texto_original\":\"texto original\"}\n\nTexto a analizar:\nrow_id = {{ $('Workflow Configuration').item.json.row_id }}\ntexto_original= {{ $('Workflow Configuration').item.json.texto_original }}\n\nRECUERDA: Devuelve SOLO el JSON, sin texto adicional. Las 3 viñetas deben tener entre 5 y 15 palabras cada una.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres un asistente experto en análisis de idiomas, traducción y resumen. Tu tarea es detectar el idioma del texto, traducirlo al español neutro y crear exactamente 3 viñetas de resumen. Debes devolver ÚNICAMENTE un objeto JSON válido sin texto adicional.",
+          "batching": {
+            "batchSize": 1,
+            "delayBetweenBatches": 5000
+          }
+        }
+      },
+      "id": "fb373a84-476a-459d-8d8f-eb538f7f16fe",
+      "name": "AI Agent - Detect, Translate, Summarize",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -3248,
+        752
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate AI Output Structure\n// This code validates the structure of the AI agent output\n// and determines the appropriate routing path\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const json = item.json.output;\n  const error = item.json.error;\n\n  if (error) {\n  results.push({\n    json: {\n      validation_status: \"fallback\",\n      row_id: $('Check texto_original Not Empty').first().json.row_id,\n      error\n    }\n  });  \n  return results;\n  }\n  \n  // Initialize validation result\n  let validation_status = 'fallback';\n  let error_message = '';\n  let validated_data = null;\n  \n  // Check if the required fields exist and are valid\n  const hasLanguage = json.idioma && typeof json.idioma === 'string' && json.idioma.trim() !== '';\n  const hasTranslation = json.traduccion_es && typeof json.traduccion_es === 'string' && json.traduccion_es.trim() !== '';\n  const hasSummary = Array.isArray(json.resumen_bullets) && json.resumen_bullets.length === 3;\n  \n  // Validate each bullet point if summary array exists\n  let bulletsValid = false;\n  if (hasSummary) {\n    bulletsValid = json.resumen_bullets.every(bullet => {\n      if (typeof bullet !== 'string' || bullet.trim() === '') return false;\n      const wordCount = bullet.trim().split(/\\s+/).length;\n      return wordCount >= 5 && wordCount <= 15;\n    });\n  }\n  \n  // Determine validation status\n  if (hasLanguage && hasTranslation && hasSummary && bulletsValid) {\n    validation_status = 'valid';\n    error_message = '';\n    validated_data = {\n      idioma: json.idioma,\n      traduccion_es: json.traduccion_es,\n      resumen_bullets: json.resumen_bullets\n    };\n  } else if (hasLanguage || hasTranslation || hasSummary) {\n    // At least one field is present, worth retrying\n    validation_status = 'retry';\n    const issues = [];\n    if (!hasLanguage) issues.push('idioma missing or invalid');\n    if (!hasTranslation) issues.push('traduccion_es missing or invalid');\n    if (!hasSummary) {\n      issues.push('resumen_bullets must have exactly 3 items');\n    } else if (!bulletsValid) {\n      issues.push('resumen_bullets items must be 5-15 words each');\n    }\n    error_message = `Validation issues: ${issues.join(', ')}`;\n  } else {\n    // No valid fields, use fallback\n    validation_status = 'fallback';\n    error_message = 'No valid fields found in AI output';\n  }\n  \n  // Return the original data plus validation info\n  results.push({\n    json: {\n      validation_status,\n      validated_data,\n      error_message,\n      row_id: json.row_id || item.json.row_id,\n      texto_original: json.texto_original || item.json.texto_original\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "5faab880-20a1-4219-ba08-8c2975bd4426",
+      "name": "Validate AI Output Structure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2896,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.validation_status }}",
+                    "rightValue": "valid",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cb6bef9f-9a48-4eda-98d2-504a32c2e66f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Valid"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.validation_status }}",
+                    "rightValue": "retry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e4c4a819-52ad-4ff5-a4c1-c8d4240c8d04"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Retry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.validation_status }}",
+                    "rightValue": "fallback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "66312311-6ce6-4fc0-a611-e65b8a62bdd6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Fallback"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "35be245d-e6dd-4f89-b5c1-a27bd3c3fd29",
+      "name": "Route by Validation Result",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2672,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "texto_original",
+              "value": "={{ $json.texto_original }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "row_id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "error_message",
+              "value": "={{ $json.error_message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "280a7434-6703-4fff-9be7-4efdb0beb4d7",
+      "name": "Prepare Retry with Format Reminder",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2176,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=REINTENTO - El formato anterior fue incorrecto. Error: {{ $json.error_message }}\n\nAnaliza el siguiente texto y devuelve ÚNICAMENTE un objeto JSON válido con este formato EXACTO:\n{\"idioma\":\"código ISO del idioma detectado (ej: en, es, fr)\",\n\"row_id\":\"row_id\",\n\"traduccion_es\":\"traducción al español neutro del texto completo\",\"resumen_bullets\":[\"viñeta 1 de 5-15 palabras\",\"viñeta 2 de 5-15 palabras\",\"viñeta 3 de 5-15 palabras\"]}\n\nTexto a analizar:\nrow_id = {{ $json.row_id }}\ntexto_original = \n{{ $json.texto_original }}\n\nIMPORTANTE:\n- Devuelve SOLO el JSON, sin texto adicional\n- Exactamente 3 viñetas en resumen_bullets\n- Cada viñeta debe tener entre 5 y 15 palabras\n- No agregues explicaciones ni comentarios",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres un asistente experto en análisis de idiomas, traducción y resumen. Tu tarea es detectar el idioma del texto, traducirlo al español neutro y crear exactamente 3 viñetas de resumen. Debes devolver ÚNICAMENTE un objeto JSON válido sin texto adicional. Este es un REINTENTO porque el formato anterior fue incorrecto."
+        }
+      },
+      "id": "3911b1fe-13ae-4597-8e6e-93012f5d7c23",
+      "name": "AI Agent - Retry with Format Reminder",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1952,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n        \"row_id\": {\n          \"type\":\"string\"\n        },\n\t\t\"idioma\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"traduccion_es\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"resumen_bullets\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t},\n\t\t\t\"minItems\": 3,\n\t\t\t\"maxItems\": 3\n\t\t}\n\t},\n\t\"required\": [\"row_id\",\"idioma\", \"traduccion_es\", \"resumen_bullets\"]\n}"
+      },
+      "id": "09ccce4a-187a-44b4-98af-c74676d3e564",
+      "name": "Structured Output Parser Retry",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1808,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Retry Output Structure\n// This code validates the structure of the AI agent retry output\n// and determines if it's valid or should use fallback\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const json = item.json.output;\n  \n  // Initialize validation result\n  let validation_status = 'fallback';\n  let error_message = '';\n  let validated_data = null;\n  \n  // Check if the required fields exist and are valid\n  const hasLanguage = json.idioma && typeof json.idioma === 'string' && json.idioma.trim() !== '';\n  const hasTranslation = json.traduccion_es && typeof json.traduccion_es === 'string' && json.traduccion_es.trim() !== '';\n  const hasSummary = json.resumen_bullets && Array.isArray(json.resumen_bullets) && json.resumen_bullets.length === 3;\n  \n  // Validate summary bullets if present\n  let validBullets = false;\n  if (hasSummary) {\n    validBullets = json.resumen_bullets.every(bullet => \n      typeof bullet === 'string' && bullet.trim() !== ''\n    );\n  }\n  \n  // Determine validation status\n  if (hasLanguage && hasTranslation && hasSummary && validBullets) {\n    validation_status = 'valid';\n    error_message = '';\n    validated_data = {\n      idioma: json.idioma,\n      traduccion_es: json.traduccion_es,\n      resumen_bullets: json.resumen_bullets\n    };\n  } else {\n    // Use fallback\n    validation_status = 'fallback';\n    const missingFields = [];\n    if (!hasLanguage) missingFields.push('idioma');\n    if (!hasTranslation) missingFields.push('traduccion_es');\n    if (!hasSummary || !validBullets) missingFields.push('resumen_bullets (must be array of 3 strings)');\n    error_message = `Retry failed - Missing or invalid fields: ${missingFields.join(', ')}`;\n  }\n  \n  // Return the validation result with all required fields\n  results.push({\n    json: {\n      validation_status,\n      validated_data,\n      error_message,\n      row_id: json.row_id,\n      texto_original: json.texto_original\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "5cd8c281-2f68-43f6-8cfe-b31a955c11f8",
+      "name": "Validate Retry Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.validation_status }}",
+              "rightValue": "valid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bd1c4fe9-0397-4c2b-8dd4-8ea17d7f67de",
+      "name": "Check Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1408,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "idioma",
+              "value": "desconocido",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "traduccion_es",
+              "value": "no aplicado",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "resumen_bullets",
+              "value": "no aplicado",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "processing_notes",
+              "value": "=Error:  {{ $json.error }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "row_id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9bcd269d-e1ff-4973-84b9-2e874468d983",
+      "name": "Set Fallback Values",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1056,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "idioma",
+              "value": "={{ $json.validated_data.idioma }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "traduccion_es",
+              "value": "={{ $json.validated_data.traduccion_es }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "resumen_bullets",
+              "value": "={{ $json.validated_data.resumen_bullets.join('\\n• ') }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "processing_notes",
+              "value": "ok",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "row_id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1e0ad0e-f469-4e18-9f4a-5360447726b1",
+      "name": "Format Valid Output for Sheets",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -960,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "idioma",
+              "value": "={{ $json.validated_data.idioma }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "traduccion_es",
+              "value": "={{ $json.validated_data.traduccion_es }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "resumen_bullets",
+              "value": "={{ $json.validated_data.resumen_bullets.join('\\n• ') }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "processing_notes",
+              "value": "retry_success",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "row_id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e06df701-1df5-4e22-8ae6-2968422a550f",
+      "name": "Format Retry Success for Sheets",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -944,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "idioma",
+              "value": "={{ $json.idioma || 'desconocido' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "traduccion_es",
+              "value": "={{ $json.traduccion_es || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "resumen_bullets",
+              "value": "={{ $json.resumen_bullets || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "processing_notes",
+              "value": "={{ $json.processing_notes || 'fallback_format_invalid' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "row_id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "80b9708c-d825-479f-bf15-02796e957fe6",
+      "name": "Format Fallback for Sheets",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -864,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "estado",
+              "value": "ok",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "detalle",
+              "value": "Successfully processed on first attempt",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8592360d-910a-4574-95a5-e7229499c008",
+      "name": "Prepare Success Log",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "estado",
+              "value": "retry",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "detalle",
+              "value": "Successfully processed after retry",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "31962fad-8658-4743-9f1e-db786b8e3897",
+      "name": "Prepare Retry Log",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "id",
+              "value": "={{ $json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "estado",
+              "value": "fallback",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "detalle",
+              "value": "Failed validation after retry - using fallback values",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aef9675a-8fc7-4094-9c28-f7a015384367",
+      "name": "Prepare Fallback Log",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Preparación de Datos antes de enviar a la IA \nAl registrar una nueva fila en el Google Sheet el flujo se activa.\nValidación de que el texto_original tenga contenido\n",
+        "height": 368,
+        "width": 720
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4096,
+        1280
+      ],
+      "typeVersion": 1,
+      "id": "e681d81c-b61d-4173-98bd-408bde39a770",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -3248,
+        976
+      ],
+      "id": "06bb7f53-8fee-4b66-859d-2a5f79ff0517",
+      "name": "Google Gemini Chat Model",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Bloque de trabajo con IA\nEn este bloque los datos se envian a la IA, se valida su estructura y luego según el resutlado de la validación se procede a escribir en el Google Sheet el resultado segun esa validacion:\n1. Exito.\n2. Reintentar.\n3. Falla o fallback:",
+        "height": 560,
+        "width": 912,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3344,
+        576
+      ],
+      "typeVersion": 1,
+      "id": "ef11cdfe-1d1e-4b13-8ebc-09a16563b232",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw",
+          "mode": "list",
+          "cachedResultName": "TotalService Multiidioma",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 165186522,
+          "mode": "list",
+          "cachedResultName": "TotalService_Multiidioma",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit#gid=165186522"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.row_id }}",
+            "idioma": "={{ $json.idioma }}",
+            "traduccion_es": "={{ $json.traduccion_es }}",
+            "resumen_bullets": "={{ $json.resumen_bullets }}",
+            "processing_notes": "={{ $json.processing_notes }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "idioma",
+              "displayName": "idioma",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "traduccion_es",
+              "displayName": "traduccion_es",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "resumen_bullets",
+              "displayName": "resumen_bullets",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "processing_notes",
+              "displayName": "processing_notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8998689a-fd37-4d8e-80b7-afc86950a173",
+      "name": "Actualizar TotalService MultiIdioma",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -32,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw",
+          "mode": "list",
+          "cachedResultName": "TotalService Multiidioma",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2136588225,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wPtYJAfDu8RszV_Gln1JMTCa9FOMBh0ppsMJcLGmhuw/edit#gid=2136588225"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "id": "={{ $json.id }}",
+            "estado": "={{ $json.estado }}",
+            "detalle": "={{ $json.detalle }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detalle",
+              "displayName": "detalle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "15a18e37-be38-4e46-8d8e-817751341a31",
+      "name": "Actualizar Logs de Proceso",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -32,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1952,
+        512
+      ],
+      "id": "9f2751e4-eaa3-4c37-9915-dbf3d1426453",
+      "name": "Google Gemini Chat Model1"
+    },
+    {
+      "parameters": {
+        "content": "## Bloque de trabajo con IA\nEste bloque se activa si hubo alguna falla en la respuesta inicial, donde se recuerda el formato requerido para el output y reintenta.",
+        "height": 672,
+        "width": 1072,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2272,
+        96
+      ],
+      "typeVersion": 1,
+      "id": "41147c57-e2e9-4af1-a186-e0795cdaeb94",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Formateo de variables por caso\nTeniendo en cuenta si el módulo de IA tuvo exito, fallo, reintento o requiriò un fallback, setea la variable de manera tal que se pueda actualizar la fila correspondiente en las tablas de Google Sheet.",
+        "height": 1600,
+        "width": 928
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1136,
+        96
+      ],
+      "typeVersion": 1,
+      "id": "f53d7585-21e9-4d3b-8de7-f4f0836717a6",
+      "name": "Sticky Note3"
+    }
+  ],
+  "connections": {
+    "New Row in Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Check texto_original Not Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check texto_original Not Empty": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Detect, Translate, Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Empty Text Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Detect, Translate, Summarize",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Detect, Translate, Summarize": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Output Structure": {
+      "main": [
+        [
+          {
+            "node": "Route by Validation Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Validation Result": {
+      "main": [
+        [
+          {
+            "node": "Format Valid Output for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Retry with Format Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Fallback Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser Retry": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Retry with Format Reminder",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Retry with Format Reminder": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Retry with Format Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Retry with Format Reminder": {
+      "main": [
+        [
+          {
+            "node": "Validate Retry Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Retry Output": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Format Retry Success for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Fallback Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fallback Values": {
+      "main": [
+        [
+          {
+            "node": "Format Fallback for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Valid Output for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Actualizar TotalService MultiIdioma",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Retry Success for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Actualizar TotalService MultiIdioma",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Retry Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Fallback for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Actualizar TotalService MultiIdioma",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Fallback Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Empty Text Log": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Logs de Proceso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Success Log": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Logs de Proceso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Retry Log": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Logs de Proceso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fallback Log": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Logs de Proceso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Detect, Translate, Summarize",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Retry with Format Reminder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": null
+}
