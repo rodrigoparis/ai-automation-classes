@@ -1,0 +1,398 @@
+{
+    "name": "RAG + Tools",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "### 📚 Load Data Flow",
+                "height": 460,
+                "width": 684,
+                "color": 7
+            },
+            "id": "ecb23530-20b0-4cf8-9c97-66ac512f7180",
+            "name": "Sticky Note1",
+            "type": "n8n-nodes-base.stickyNote",
+            "position": [
+                1376,
+                560
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "content": "### 🐕 2. Retriever Flow",
+                "height": 412,
+                "width": 680,
+                "color": 7
+            },
+            "id": "8f963f1f-79dc-4389-b798-4b7d1ffce8a3",
+            "name": "Sticky Note2",
+            "type": "n8n-nodes-base.stickyNote",
+            "position": [
+                1344,
+                80
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "availableInChat": true,
+                "agentName": "AI Agent",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+            "typeVersion": 1.4,
+            "position": [
+                1136,
+                160
+            ],
+            "id": "9c7f16de-e0e6-4373-a756-815120975866",
+            "name": "When chat message received",
+            "webhookId": "a9f958d3-e178-4bde-a575-e497c0b248a7"
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 3.1,
+            "position": [
+                0,
+                0
+            ],
+            "id": "ba2497e0-fc69-43dc-80e4-6eb900b2fcd2",
+            "name": "AI Agent"
+        },
+        {
+            "parameters": {
+                "model": {
+                    "__rl": true,
+                    "mode": "list",
+                    "value": "gpt-4.1-mini"
+                },
+                "builtInTools": {},
+                "options": {
+                    "temperature": 0.7
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.3,
+            "position": [
+                -144,
+                208
+            ],
+            "id": "425d330c-deab-4460-8eea-eb2600ed196a",
+            "name": "OpenAI Chat Model",
+            "credentials": {
+                "openAiApi": {
+                    "id": "MCAhGAclZ5dxt2Zz",
+                    "name": "n8n free OpenAI API credits"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "options": {
+                    "systemMessage": "You are a helpful assistant.\nDO NO HALLUCINATE AND NOT ANSWER BASED ON YOUR TRAINING KNOWLEDGE. Only use your internal memory or tools and kindly answer to the user that you can not help on the specific request."
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 3.1,
+            "position": [
+                1456,
+                160
+            ],
+            "id": "2e9d1f93-5c37-4715-b12a-cd4362cee30d",
+            "name": "AI Agent1",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "modelName": "models/gemini-2.5-pro",
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                1248,
+                352
+            ],
+            "id": "ba28936a-bb6a-4b79-adae-cd34008ea24d",
+            "name": "Google Gemini Chat Model",
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "j099853ldREEX9te",
+                    "name": "Google Gemini(PaLM) Api account"
+                }
+            }
+        },
+        {
+            "parameters": {},
+            "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+            "typeVersion": 1,
+            "position": [
+                1936,
+                288
+            ],
+            "id": "5e56afb5-48ec-4eaf-96a2-27db1db93b2c",
+            "name": "Calculator"
+        },
+        {
+            "parameters": {
+                "description": "Advanced math tool for complex calculations and custom mathematical operations",
+                "jsCode": "// Advanced math tool for complex calculations\n// Supports basic arithmetic, exponents, square roots, and more\n\ntry {\n  // Clean the query and prepare for evaluation\n  const expression = query.trim();\n  \n  // Add support for common math functions\n  const mathContext = {\n    sqrt: Math.sqrt,\n    pow: Math.pow,\n    abs: Math.abs,\n    sin: Math.sin,\n    cos: Math.cos,\n    tan: Math.tan,\n    log: Math.log,\n    exp: Math.exp,\n    floor: Math.floor,\n    ceil: Math.ceil,\n    round: Math.round,\n    PI: Math.PI,\n    E: Math.E\n  };\n  \n  // Evaluate the mathematical expression\n  // Note: Using Function constructor for safe evaluation\n  const result = new Function(...Object.keys(mathContext), `return ${expression}`)(...Object.values(mathContext));\n  \n  if (typeof result === 'number' && !isNaN(result)) {\n    return `The result is: ${result}`;\n  } else {\n    return 'Invalid mathematical expression or result';\n  }\n} catch (error) {\n  return `Error evaluating expression: ${error.message}. Please provide a valid mathematical expression.`;\n}"
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.3,
+            "position": [
+                1920,
+                144
+            ],
+            "id": "f77c6c86-4f48-4912-867a-5a2d4bc81872",
+            "name": "MathTool"
+        },
+        {
+            "parameters": {
+                "contextWindowLength": 10
+            },
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1.3,
+            "position": [
+                1392,
+                352
+            ],
+            "id": "86de35d7-09d3-4251-af7f-e5802d62c47d",
+            "name": "Simple Memory"
+        },
+        {
+            "parameters": {
+                "mode": "retrieve-as-tool",
+                "toolDescription": "Use this knowledge base to answer the questions from the user.",
+                "memoryKey": {
+                    "__rl": true,
+                    "mode": "list",
+                    "value": "vector_store_key"
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+            "typeVersion": 1.3,
+            "position": [
+                1632,
+                368
+            ],
+            "id": "34a27407-d328-41c3-98c2-2f7621c7ac87",
+            "name": "Simple Vector Store"
+        },
+        {
+            "parameters": {
+                "modelName": "models/gemini-embedding-001"
+            },
+            "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                1520,
+                608
+            ],
+            "id": "59a4ef22-312f-41d7-9df2-1b2d50eb07df",
+            "name": "Embeddings Google Gemini",
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "j099853ldREEX9te",
+                    "name": "Google Gemini(PaLM) Api account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "mode": "insert",
+                "memoryKey": {
+                    "__rl": true,
+                    "mode": "list",
+                    "value": "vector_store_key"
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+            "typeVersion": 1.3,
+            "position": [
+                1648,
+                752
+            ],
+            "id": "fe15eee5-5891-469e-a8fa-26416a1a29e7",
+            "name": "Simple Vector Store1"
+        },
+        {
+            "parameters": {
+                "formTitle": "Upload your data",
+                "formDescription": "Upload documents to add to the knowledge base",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Upload your file(s)",
+                            "fieldType": "file",
+                            "acceptFileTypes": ".pdf, .csv",
+                            "requiredField": true
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "13086ba8-e12a-41b0-ab91-eb1b2b5a5e0d",
+            "name": "Upload your file here",
+            "type": "n8n-nodes-base.formTrigger",
+            "position": [
+                1408,
+                752
+            ],
+            "webhookId": "69719e95-a0a0-4a93-a5e5-1218f20a4d53",
+            "typeVersion": 2.2
+        },
+        {
+            "parameters": {
+                "dataType": "binary",
+                "options": {}
+            },
+            "id": "19128cfa-729b-4e4f-a055-256a37dc18e7",
+            "name": "Default Data Loader1",
+            "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+            "position": [
+                1648,
+                960
+            ],
+            "typeVersion": 1.1
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "When chat message received": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Calculator": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "MathTool": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Simple Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Simple Vector Store": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Embeddings Google Gemini": {
+            "ai_embedding": [
+                [
+                    {
+                        "node": "Simple Vector Store",
+                        "type": "ai_embedding",
+                        "index": 0
+                    },
+                    {
+                        "node": "Simple Vector Store1",
+                        "type": "ai_embedding",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Simple Vector Store1": {
+            "main": [
+                []
+            ]
+        },
+        "Upload your file here": {
+            "main": [
+                [
+                    {
+                        "node": "Simple Vector Store1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Default Data Loader1": {
+            "ai_document": [
+                [
+                    {
+                        "node": "Simple Vector Store1",
+                        "type": "ai_document",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1",
+        "availableInMCP": false
+    },
+    "versionId": "9b50f310-530d-4ece-9dc7-b2d3d5fd61df",
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "47e0ac23754888a751565010093cb153a14e86fc36ec624cb1a41d9cfa067cfb"
+    },
+    "id": "Z6adD4UJGUmkBT9i",
+    "tags": []
+}

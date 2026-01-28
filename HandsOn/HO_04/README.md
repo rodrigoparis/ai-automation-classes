@@ -9,3 +9,7 @@ An advanced logistics AI agent.
 *   Assesses risk factors (Weather, Traffic).
 *   Optimizes routes based on risk assessment.
 *   Demonstrates complex decision-making logic using AI agents.
+
+### HO4_RAG_and_Tools.json
+A workflow demonstrating Retrieval Augmented Generation (RAG) combined with tool usage.
+
